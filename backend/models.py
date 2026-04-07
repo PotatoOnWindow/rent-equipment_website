@@ -1,6 +1,8 @@
-from tortoise import Model
+import pydantic
+from tortoise import Model, fields
 from pydantic import BaseModel
 from datetime import datetime
+from tortoise.contrib.pydantic import pydantic_model_creator
 
 
 class User(Model):
@@ -39,4 +41,13 @@ class AllOffers(Model):
     offer_cost = fields.FloatField(null=False)
     offer_expiration_date = fields.ForeignKeyField('models.UserOffer', related_name = 'exprn_date')
 
-    
+   
+user_pydantic = pydantic_model_creator(User, name = "User", exclude=("is_verified"))
+user_pydanticIn = pydantic_model_creator(User, name = "UserIn", exclude_readonly=True, exclude=("is_verified", "join_date"))
+user_pydanticOut = pydantic_model_creator(User, name = "UserOut", exclude=("password", ))
+
+machineryType_pydantic = pydantic_model_creator(MachineryType, name = "MachineryType")
+
+user_offer_pydantic = pydantic_model_creator(UserOffer, name="UserOffer")
+user_offer_pydanticIn = pydantic_model_creator(UserOffer, name="UserOfferIn", exclude_readonly=True)
+
