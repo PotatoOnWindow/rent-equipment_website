@@ -35,6 +35,7 @@ class UserOffer(Model):
     offer_image = fields.CharField(max_length=20, null=False)
 
 
+# useless for now
 class AllOffers(Model):
     id = fields.IntField(pk = True, index = True)
     offerId = fields.ForeignKeyField('models.UserOffer')
