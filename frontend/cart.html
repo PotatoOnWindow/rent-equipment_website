@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Корзина</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div id="navbar"></div>
+    </nav>
+
+    <main class="container">
+        <h1>Корзина</h1>
+        <div id="cart-content"></div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        async function loadCart() {
+            const container = document.getElementById('cart-content');
+            const cart = CartManager.get();
+            const user = UserManager.get();
+
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">Корзина пуста. <a href="index.html">Вернуться в каталог</a></div>';
+                return;
+            }
+
+            // Загружаем детали по каждому типу техники для актуальных цен
+            const itemsWithDetails = await Promise.all(cart.map(async (item) => {
+                const details = await API.getMachineryDetails(item.machinery_type_id);
+                return { ...item, ...details };
+            }));
+
+            let html = `
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Техника</th>
+                            <th>Кол-во</th>
+                            <th>Дата начала</th>
+                            <th>Дата окончания</th>
+                            <th>Стоимость</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            itemsWithDetails.forEach(item => {
+                html += `
+                    <tr>
+                        <td>${item.type_name}</td>
+                        <td>${item.amount}</td>
+                        <td><input type="date" id="start-${item.machinery_type_id}" required></td>
+                        <td><input type="date" id="end-${item.machinery_type_id}" required></td>
+                        <td id="cost-${item.machinery_type_id}">—</td>
+                        <td><button class="btn-danger" onclick="CartManager.remove(${item.machinery_type_id}); loadCart();">Удалить</button></td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div class="text-right">
+                    <p><strong>Общая стоимость: <span id="total-cost">0</span> ₽</strong></p>
+                    ${user ? 
+                        '<button class="btn btn-success" onclick="checkout()">Подтвердить заказ</button>' : 
+                        '<div class="alert alert-info">Для оформления заказа необходимо <a href="login.html">войти</a> или <a href="register.html">зарегистрироваться</a>.</div>'
+                    }
+                </div>
+            `;
+
+            container.innerHTML = html;
+
+            // Вешаем обработчики на поля дат для пересчета
+            itemsWithDetails.forEach(item => {
+                const startInput = document.getElementById(`start-${item.machinery_type_id}`);
+                const endInput = document.getElementById(`end-${item.machinery_type_id}`);
+                const handler = () => calculateItemCost(item.machinery_type_id, item.amount);
+                startInput.addEventListener('change', handler);
+                endInput.addEventListener('change', handler);
+            });
+        }
+
+        async function calculateItemCost(machineryId, amount) {
+            const start = document.getElementById(`start-${machineryId}`).value;
+            const end = document.getElementById(`end-${machineryId}`).value;
+            
+            if (!start || !end) return;
+
+            try {
+                const data = await API.calculateCost(machineryId, amount, start, end);
+                document.getElementById(`cost-${machineryId}`).innerText = data.total_cost + ' ₽';
+                updateTotal();
+            } catch (e) {
+                alert('Ошибка расчета стоимости: ' + e.message);
+            }
+        }
+
+        function updateTotal() {
+            const costCells = document.querySelectorAll('[id^="cost-"]');
+            let total = 0;
+            costCells.forEach(cell => {
+                const val = parseFloat(cell.innerText);
+                if (!isNaN(val)) total += val;
+            });
+            document.getElementById('total-cost').innerText = total;
+        }
+
+        window.checkout = async () => {
+            const user = UserManager.get();
+            if (!user) {
+                alert('Необходимо авторизоваться');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const cart = CartManager.get();
+            const items = [];
+            
+            for (const item of cart) {
+                const start = document.getElementById(`start-${item.machinery_type_id}`).value;
+                const end = document.getElementById(`end-${item.machinery_type_id}`).value;
+                
+                if (!start || !end) {
+                    alert('Заполните даты для всей техники');
+                    return;
+                }
+                
+                items.push({
+                    machinery_type_id: item.machinery_type_id,
+                    amount: item.amount,
+                    start_date: start,
+                    expiration_date: end
+                });
+            }
+
+            try {
+                const response = await API.createOffers({
+                    user_id: user.user_id,
+                    items: items
+                });
+                
+                alert('Заказ успешно оформлен!');
+                CartManager.clear();
+                window.location.href = 'profile.html';
+            } catch (e) {
+                alert('Ошибка оформления: ' + e.message);
+            }
+        };
+
+        loadCart();
+    </script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои заказы</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div id="navbar"></div>
+    </nav>
+    
+    <main class="container">
+        <h1>Мои заказы</h1>
+        <div id="orders-list"></div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        async function loadOrders() {
+            const container = document.getElementById('orders-list');
+            
+            // Проверяем авторизацию
+            const user = UserManager.get();
+            if (!user) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        Для просмотра заказов необходимо 
+                        <a href="login.html">войти</a> или 
+                        <a href="register.html">зарегистрироваться</a>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                container.innerHTML = '<div class="text-center">Загрузка заказов...</div>';
+                
+                const data = await API.getUserOffers(user.user_id);
+                
+                if (!data.offers || data.offers.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-info">
+                            <p>У вас пока нет заказов</p>
+                            <a href="index.html" class="btn" style="margin-top: 1rem;">Перейти в каталог</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>ID заказа</th>
+                                <th>Техника</th>
+                                <th>Количество</th>
+                                <th>Период аренды</th>
+                                <th>Стоимость</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.offers.map(offer => `
+                                <tr>
+                                    <td><strong>#${offer.id}</strong></td>
+                                    <td>${offer.machinery_type}</td>
+                                    <td>${offer.amount}</td>
+                                    <td>${formatDate(offer.start_date)} — ${formatDate(offer.expiration_date)}</td>
+                                    <td><strong>${offer.total_cost.toLocaleString()} ₽</strong></td>
+                                    <td>
+                                        <span class="status-badge status-${offer.status}">
+                                            ${getStatusText(offer.status)}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    
+                    <div style="margin-top: 2rem;">
+                        <a href="index.html" class="btn">← Вернуться в каталог</a>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Ошибка загрузки заказов:', error);
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <p>Ошибка загрузки заказов: ${error.message}</p>
+                        <button onclick="loadOrders()" class="btn" style="margin-top: 1rem;">Попробовать снова</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Вспомогательные функции
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ru-RU');
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'active': 'Активен',
+                'completed': 'Завершён',
+                'cancelled': 'Отменён',
+                'pending': 'В обработке'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Добавляем стили для статусов
+        const statusStyles = document.createElement('style');
+        statusStyles.textContent = `
+            .status-badge {
+                padding: 0.25rem 0.75rem;
+                border-radius: 20px;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+            .status-active {
+                background: #d4edda;
+                color: #155724;
+            }
+            .status-completed {
+                background: #cce5ff;
+                color: #004085;
+            }
+            .status-cancelled {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            .status-pending {
+                background: #fff3cd;
+                color: #856404;
+            }
+        `;
+        document.head.appendChild(statusStyles);
+
+        // Загружаем заказы при открытии страницы
+        loadOrders();
+    </script>
+</body>
+</html>

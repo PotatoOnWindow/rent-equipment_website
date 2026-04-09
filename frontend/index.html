@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог техники</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div id="navbar"></div>
+    </nav>
+
+    <main class="container">
+        <h1>Доступная техника для аренды</h1>
+        <div id="machinery-list" class="card-grid">
+            <div class="text-center">Загрузка...</div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        // Глобальный объект для хранения данных о технике
+        let machineryData = [];
+
+        async function loadMachinery() {
+            const container = document.getElementById('machinery-list');
+            try {
+                const data = await API.getMachinery();
+                if (!data.machinery_types || data.machinery_types.length === 0) {
+                    container.innerHTML = '<div class="alert alert-info">Нет возможности аренды прямо сейчас</div>';
+                    return;
+                }
+
+                machineryData = data.machinery_types; // Сохраняем данные
+
+                container.innerHTML = data.machinery_types.map(m => `
+                    <div class="card" id="card-${m.id}">
+                        <h3>${m.type_name}</h3>
+                        <p>💰 ${m.cost_for_hour} ₽ / час</p>
+                        <p>📅 ${m.cost_for_day} ₽ / день</p>
+                        <div style="margin-top: 1rem;">
+                            <label>Количество:</label>
+                            <input type="number" id="amount-${m.id}" value="1" min="1" style="width: 80px;">
+                        </div>
+                        <button class="btn btn-block" style="margin-top: 1rem;" onclick="addToCart(${m.id})">
+                            Добавить в корзину
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<div class="alert alert-info">Ошибка загрузки каталога</div>';
+            }
+        }
+
+        window.addToCart = (machineryId) => {
+            const amountInput = document.getElementById(`amount-${machineryId}`);
+            const amount = parseInt(amountInput.value) || 1;
+            
+            // Находим информацию о технике в сохранённых данных
+            const machinery = machineryData.find(m => m.id === machineryId);
+            
+            if (!machinery) {
+                alert('Ошибка: техника не найдена');
+                return;
+            }
+            
+            CartManager.add({
+                machinery_type_id: machineryId,
+                amount: amount,
+                type_name: machinery.type_name
+            });
+            
+            // Показываем уведомление
+            showNotification(`✅ ${machinery.type_name} (${amount} шт.) добавлено в корзину`);
+        };
+
+        // Простая функция для уведомлений
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 1rem;
+                border-radius: 4px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Добавляем стили для анимации
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        loadMachinery();
+    </script>
+</body>
+</html>
