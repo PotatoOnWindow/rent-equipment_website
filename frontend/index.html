@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Каталог техники</title>
@@ -21,6 +24,18 @@
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
+	// В начало скрипта в index.html добавь:
+	document.addEventListener('DOMContentLoaded', () => {
+	    console.log('Index page loaded');
+	    const user = UserManager.get();
+	    console.log('Current user on index:', user);
+    
+	    // Принудительно обновляем навигацию
+	    setTimeout(() => {
+	        renderNavbar();
+	    }, 100);
+	});	
+	
         // Глобальный объект для хранения данных о технике
         let machineryData = [];
 

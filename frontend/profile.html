@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мои заказы</title>
@@ -12,36 +15,48 @@
     </nav>
     
     <main class="container">
-        <h1>Мои заказы</h1>
+        <h1>Мой профиль</h1>
+        <div id="profile-info"></div>
+        <h2 style="margin-top: 2rem;">Мои заказы</h2>
         <div id="orders-list"></div>
     </main>
 
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
-        async function loadOrders() {
-            const container = document.getElementById('orders-list');
-            
-            // Проверяем авторизацию
+        async function loadProfile() {
             const user = UserManager.get();
+            const profileInfo = document.getElementById('profile-info');
+            const ordersContainer = document.getElementById('orders-list');
+            
             if (!user) {
-                container.innerHTML = `
+                profileInfo.innerHTML = `
                     <div class="alert alert-info">
-                        Для просмотра заказов необходимо 
+                        Для просмотра профиля необходимо 
                         <a href="login.html">войти</a> или 
                         <a href="register.html">зарегистрироваться</a>
                     </div>
                 `;
+                ordersContainer.innerHTML = '';
                 return;
             }
 
+            // Показываем информацию о пользователе
+            profileInfo.innerHTML = `
+                <div class="card">
+                    <h3>👤 ${user.username}</h3>
+                    <p>📧 ${user.email}</p>
+                </div>
+            `;
+
+            // Загружаем заказы
             try {
-                container.innerHTML = '<div class="text-center">Загрузка заказов...</div>';
+                ordersContainer.innerHTML = '<div class="text-center">Загрузка заказов...</div>';
                 
                 const data = await API.getUserOffers(user.user_id);
                 
                 if (!data.offers || data.offers.length === 0) {
-                    container.innerHTML = `
+                    ordersContainer.innerHTML = `
                         <div class="alert alert-info">
                             <p>У вас пока нет заказов</p>
                             <a href="index.html" class="btn" style="margin-top: 1rem;">Перейти в каталог</a>
@@ -50,7 +65,7 @@
                     return;
                 }
 
-                container.innerHTML = `
+                ordersContainer.innerHTML = `
                     <table class="cart-table">
                         <thead>
                             <tr>
@@ -79,23 +94,18 @@
                             `).join('')}
                         </tbody>
                     </table>
-                    
-                    <div style="margin-top: 2rem;">
-                        <a href="index.html" class="btn">← Вернуться в каталог</a>
-                    </div>
                 `;
             } catch (error) {
                 console.error('Ошибка загрузки заказов:', error);
-                container.innerHTML = `
+                ordersContainer.innerHTML = `
                     <div class="alert alert-info">
                         <p>Ошибка загрузки заказов: ${error.message}</p>
-                        <button onclick="loadOrders()" class="btn" style="margin-top: 1rem;">Попробовать снова</button>
+                        <button onclick="loadProfile()" class="btn" style="margin-top: 1rem;">Попробовать снова</button>
                     </div>
                 `;
             }
         }
 
-        // Вспомогательные функции
         function formatDate(dateString) {
             const date = new Date(dateString);
             return date.toLocaleDateString('ru-RU');
@@ -139,8 +149,7 @@
         `;
         document.head.appendChild(statusStyles);
 
-        // Загружаем заказы при открытии страницы
-        loadOrders();
+        loadProfile();
     </script>
 </body>
 </html>

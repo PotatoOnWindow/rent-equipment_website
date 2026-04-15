@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Регистрация</title>
@@ -10,6 +13,7 @@
     <nav class="navbar"><div id="navbar"></div></nav>
     <main class="container" style="max-width: 400px;">
         <h1>Регистрация</h1>
+        <div id="message" class="alert alert-info" style="display: none;"></div>
         <form id="registerForm">
             <div class="form-group">
                 <label>Имя пользователя</label>
@@ -25,22 +29,57 @@
             </div>
             <button type="submit" class="btn btn-block">Зарегистрироваться</button>
         </form>
+        <p class="text-center" style="margin-top: 1rem;">
+            Уже есть аккаунт? <a href="login.html">Войти</a>
+        </p>
     </main>
 
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
+        // Проверяем, не авторизован ли уже пользователь
+        const currentUser = UserManager.get();
+        if (currentUser) {
+            const form = document.getElementById('registerForm');
+            const message = document.getElementById('message');
+            
+            form.style.display = 'none';
+            message.style.display = 'block';
+            message.innerHTML = `
+                <p>Вы уже авторизованы как <strong>${currentUser.username}</strong></p>
+                <p>Для регистрации нового аккаунта сначала выйдите из текущего.</p>
+                <div style="margin-top: 1rem;">
+                    <a href="index.html" class="btn">Вернуться в каталог</a>
+                    <a href="profile.html" class="btn btn-success">Перейти в профиль</a>
+                </div>
+            `;
+        }
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Регистрация...';
+            
             try {
                 const user = await API.register(data);
-                UserManager.save(user);
-                window.location.href = 'index.html';
+		    UserManager.save({
+			    user_id: user.user_id,
+			    username: user.username,
+			    email: user.email
+		    });
+                
+                const redirectPage = sessionStorage.getItem('redirectAfterLogin') || 'index.html';
+                sessionStorage.removeItem('redirectAfterLogin');
+                
+                window.location.href = redirectPage;
             } catch (e) {
                 alert('Ошибка регистрации: ' + e.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Зарегистрироваться';
             }
         });
     </script>
