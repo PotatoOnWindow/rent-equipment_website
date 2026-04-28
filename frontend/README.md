@@ -6,10 +6,10 @@ how to launch:
 
 make your venv in /backend directory with command
   ```python -m venv .venv```
-(works only if you using linux)
 
 Then activate your venv:
   ```source .venv/bin/activate```
+(There is other command for Windows)
 
 Then install all requirements:
   ```pip install -r requirements.txt```
