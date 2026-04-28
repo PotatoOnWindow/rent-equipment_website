@@ -14,11 +14,11 @@ class User(Model):
 
 
 class MachineryType(Model):
-    id = fields.IntField(pk = True, index = True)
-    type_name = fields.CharField(max_length=20, null = False, unique = True)
-    cost_for_hour = fields.FloatField(null = False)
-    cost_for_day = fields.FloatField(null = False)
-    cost_for_month = fields.FloatField(null = False)
+    id = fields.IntField(pk=True, index=True)
+    type_name = fields.CharField(max_length=20, null=False, unique=True)
+    cost_for_hour = fields.FloatField(null=False)
+    cost_for_day = fields.FloatField(null=False)
+    cost_for_month = fields.FloatField(null=False)
 
 
 class UserOffer(Model):
@@ -32,7 +32,7 @@ class UserOffer(Model):
     start_date = fields.DateField(null=False, default=datetime.utcnow)
     expiration_date = fields.DateField(null=False)
     status = fields.CharField(max_length=20, null=False, default='active')
-    offer_image = fields.CharField(max_length=20, null=False)
+    offer_image = fields.CharField(max_length=255, null=True)
 
 
 # useless for now
@@ -41,6 +41,14 @@ class AllOffers(Model):
     offerId = fields.ForeignKeyField('models.UserOffer')
     offer_cost = fields.FloatField(null=False)
     offer_expiration_date = fields.ForeignKeyField('models.UserOffer', related_name = 'exprn_date')
+
+
+# adds a machinery type
+class MachineryCreate(BaseModel):
+    type_name: str
+    cost_for_hour: float
+    cost_for_day: float
+    cost_for_month: float
 
    
 user_pydantic = pydantic_model_creator(User, name = "User", exclude=("is_verified"))

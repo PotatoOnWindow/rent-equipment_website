@@ -25,7 +25,7 @@
         async function loadCart() {
             const container = document.getElementById('cart-content');
             const cart = CartManager.get();
-            const user = UserManager.get();
+		const isAuth = AuthManager.isAuthenticated();
 
             if (cart.length === 0) {
                 container.innerHTML = '<div class="alert alert-info">Корзина пуста. <a href="index.html">Вернуться в каталог</a></div>';
@@ -71,7 +71,7 @@
                 </table>
                 <div class="text-right">
                     <p><strong>Общая стоимость: <span id="total-cost">0</span> ₽</strong></p>
-                    ${user ? 
+                    ${isAuth ? 
                         '<button class="btn btn-success" onclick="checkout()">Подтвердить заказ</button>' : 
                         '<div class="alert alert-info">Для оформления заказа необходимо <a href="login.html">войти</a> или <a href="register.html">зарегистрироваться</a>.</div>'
                     }
@@ -101,6 +101,7 @@
                 document.getElementById(`cost-${machineryId}`).innerText = data.total_cost + ' ₽';
                 updateTotal();
             } catch (e) {
+		console.log(e);
                 alert('Ошибка расчета стоимости: ' + e.message);
             }
         }
@@ -116,8 +117,8 @@
         }
 
         window.checkout = async () => {
-            const user = UserManager.get();
-            if (!user) {
+            //const user = UserManager.get();
+            if (!AuthManager.isAuthenticated()) {
                 alert('Необходимо авторизоваться');
                 window.location.href = 'login.html';
                 return;
@@ -145,7 +146,6 @@
 
             try {
                 const response = await API.createOffers({
-                    user_id: user.user_id,
                     items: items
                 });
                 

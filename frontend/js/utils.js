@@ -1,42 +1,31 @@
-// Принудительная очистка кэша состояния для Firefox
-if (navigator.userAgent.includes('Firefox')) {
-    window.addEventListener('pageshow', (event) => {
-        if (event.persisted) {
-            console.log('Page was loaded from bfcache, refreshing state');
-            renderNavbar();
-        }
-    });
-}
+// Обработка возврата страницы из bfcache -- решение для всех браузеров
+window.addEventListener('pageshow', (event) => {
+	console.log('pageshow fired, persisted: ', event.persisted);
 
-// Управление состоянием пользователя
-const UserManager = {
-    save: (user) => {
-        console.log('Saving user:', user);
-        localStorage.setItem('user', JSON.stringify(user));
-        // Обновляем навигацию сразу после сохранения
-        renderNavbar();
+	// На всякий случай
+	renderNavbar();
+});
+
+
+const AuthManager = {
+    saveToken: (token) => {
+        localStorage.setItem('token', token);
     },
-    get: () => {
-        try {
-            const user = localStorage.getItem('user');
-            console.log('Getting user from storage:', user);
-            return user ? JSON.parse(user) : null;
-        } catch (e) {
-            console.error('Error parsing user data:', e);
-            return null;
-        }
+
+    getToken: () => {
+        return localStorage.getItem('token');
     },
-    remove: () => {
-        console.log('Removing user');
-        localStorage.removeItem('user');
-        renderNavbar();
+
+    logout: () => {
+        localStorage.removeItem('token');
+        window.location.href = 'login.html';
     },
-    isLoggedIn: () => {
-        const loggedIn = !!localStorage.getItem('user');
-        console.log('Is logged in:', loggedIn);
-        return loggedIn;
+
+    isAuthenticated: () => {
+        return !!localStorage.getItem('token');
     }
 };
+
 
 // Управление корзиной
 const CartManager = {
@@ -92,36 +81,33 @@ function updateCartDisplay() {
     renderNavbar();
 }
 
-// Рендеринг навигации
+
 function renderNavbar() {
     const navContainer = document.getElementById('navbar');
-    if (!navContainer) {
-        console.log('Navbar container not found');
-        return;
-    }
+    if (!navContainer) return;
 
-    const user = UserManager.get();
     const cartCount = CartManager.count();
-    
-    console.log('Rendering navbar. User:', user, 'Cart count:', cartCount);
 
-    navContainer.innerHTML = `
-        <div class="container">
-            <a href="index.html" class="logo">🚜 RentTech</a>
-            <div class="nav-links">
-                <a href="index.html">Каталог</a>
-                <a href="cart.html" class="cart-badge">🛒 Корзина (${cartCount})</a>
-                ${user ? `
-                    <a href="profile.html" class="user-profile-link">👤 ${user.username}</a>
-                    <button id="logoutBtn" class="btn-logout">Выйти</button>
-                ` : `
-                    <a href="login.html" id="loginLink">Войти</a>
-                    <a href="register.html" id="registerLink">Регистрация</a>
-                `}
-            </div>
-        </div>
-    `;
+    if (AuthManager.isAuthenticated()) {
+        navContainer.innerHTML = `
+            <a href="index.html">Каталог</a>
+            <a href="cart.html">🛒 Корзина (${cartCount})</a>
+            <a href="profile.html">Профиль</a>
+            <button onclick="AuthManager.logout()">Выйти</button>
+        `;
+    } else {
+        navContainer.innerHTML = `
+            <a href="index.html">Каталог</a>
+            <a href="cart.html">🛒 Корзина (${cartCount})</a>
+            <a href="login.html">Войти</a>
+            <a href="register.html">Регистрация</a>
+        `;
+    }
+}
 
+
+// Рендеринг навигации
+/*
     // Добавляем обработчик для кнопки выхода
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -133,12 +119,12 @@ function renderNavbar() {
             window.location.href = 'index.html';
         });
     }
-}
+}*/
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Page loaded, initializing...');
-    console.log('Current user:', UserManager.get());
+    console.log('Current user:', AuthManager.getToken());
     console.log('Current cart:', CartManager.get());
     
     renderNavbar();
@@ -150,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Current page:', currentPage);
     
     if (protectedPages.includes(currentPage)) {
-        const user = UserManager.get();
+        const user = AuthManager.getToken();
         if (!user) {
             console.log('Protected page accessed without auth, redirecting to login');
             // Сохраняем текущую страницу для возврата после логина
@@ -161,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Для страниц логина и регистрации проверяем, не авторизован ли уже пользователь
     if (currentPage === 'login.html' || currentPage === 'register.html') {
-        const user = UserManager.get();
+        const user = AuthManager.getToken();
         if (user) {
             console.log('Already logged in, accessing login/register page');
             // Не делаем автоматического редиректа, страницы сами обработают это
@@ -171,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Экспортируем функции для использования в консоли (для отладки)
 window.debug = {
-    getUser: () => UserManager.get(),
+    getUser: () => AuthManager.getToken(),
     getCart: () => CartManager.get(),
     clearAll: () => {
         localStorage.clear();

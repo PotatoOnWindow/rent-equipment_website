@@ -24,18 +24,6 @@
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
-	// В начало скрипта в index.html добавь:
-	document.addEventListener('DOMContentLoaded', () => {
-	    console.log('Index page loaded');
-	    const user = UserManager.get();
-	    console.log('Current user on index:', user);
-    
-	    // Принудительно обновляем навигацию
-	    setTimeout(() => {
-	        renderNavbar();
-	    }, 100);
-	});	
-	
         // Глобальный объект для хранения данных о технике
         let machineryData = [];
 

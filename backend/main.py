@@ -1,3 +1,8 @@
+from jose import JWTError, jwt
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from datetime import datetime, timedelta
+
 from fastapi import FastAPI, HTTPException
 from tortoise.contrib.fastapi import register_tortoise
 from models import *
@@ -8,6 +13,39 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# configuring encryption key 
+SECRET_KEY = "admin"  # encryption key. to change
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 день
+
+security = HTTPBearer()
+
+
+# for auth
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# gets user token
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("user_id")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = await User.get_or_none(id=user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
+
 
 # Добавляем CORS для работы с фронтендом
 app.add_middleware(
@@ -26,12 +64,52 @@ class CartItemRequest(BaseModel):
     expiration_date: str
 
 class CheckoutRequest(BaseModel):
-    user_id: int
     items: List[CartItemRequest]
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+# adds a machinery type
+class MachineryCreate(BaseModel):
+    type_name: str
+    cost_for_hour: float
+    cost_for_day: float
+    cost_for_month: float
+
+
+@app.post("/offer/{offer_id}/cancel")
+async def cancel_offer(offer_id: int, current_user: User = Depends(get_current_user)):
+    offer = await UserOffer.get_or_none(id=offer_id, userId_id=current_user.id)
+
+    if not offer:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    if offer.status == "cancelled":
+        return {"status": "ok", "message": "Уже отменён"}
+
+    offer.status = "cancelled"
+    await offer.save()
+
+    return {
+        "status": "ok",
+        "message": "Заказ отменён",
+        "offer_id": offer.id
+    }
+
+
+@app.post("/machinery/create")
+async def create_machinery(data: MachineryCreate):
+    machinery = await MachineryType.create(**data.dict())
+
+    return {
+            "status": "ok",
+            "id": machinery.id, 
+            "type_name": machinery.type_name
+            }
+
+
 
 @app.get("/")
 async def get_machinery_types():
@@ -57,6 +135,18 @@ async def get_machinery_types():
     return {
         "machinery_types": types_list
     }
+
+
+
+# user account page
+@app.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email
+    }
+
 
 @app.get("/machinery/{machinery_id}")
 async def get_machinery_details(machinery_id: int):
@@ -96,25 +186,22 @@ async def user_register(user: user_pydanticIn):
         "message": f"Привет, {new_user.username}! Регистрация успешна."
     }
 
+
+# authorization
 @app.post("/login")
 async def login(login_data: LoginRequest):
-    """Авторизация пользователя"""
     user = await User.get_or_none(email=login_data.email)
-    
-    if not user:
+
+    if not user or user.password != login_data.password:
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
-    
-    # Проверяем пароль (временно без хеширования)
-    if user.password != login_data.password:
-        raise HTTPException(status_code=401, detail="Неверный email или пароль")
-    
+
+    token = create_access_token({"user_id": user.id})
+
     return {
-        "status": "ok",
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "message": f"Добро пожаловать, {user.username}!"
+        "access_token": token,
+        "token_type": "bearer"
     }
+
 
 @app.post("/calculate-cost")
 async def calculate_cost(machinery_type_id: int, amount: int, start_date: str, expiration_date: str):
@@ -178,10 +265,12 @@ async def calculate_cost(machinery_type_id: int, amount: int, start_date: str, e
     }
 
 @app.post("/offer/create")
-async def create_offer(checkout_data: CheckoutRequest):
+async def create_offer(checkout_data: CheckoutRequest, current_user: User = Depends(get_current_user)):
+
     """Создание заказов после подтверждения"""
     # Проверяем существование пользователя
-    user = await User.get_or_none(id=checkout_data.user_id)
+    user = current_user
+
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
@@ -210,7 +299,7 @@ async def create_offer(checkout_data: CheckoutRequest):
         
         # Создаём запись в UserOffer
         offer = await UserOffer.create(
-            userId_id=checkout_data.user_id,
+            userId_id=current_user.id, # user_id,
             machineryTypeId_id=item.machinery_type_id,
             amount=item.amount,
             total_cost=total_cost,
@@ -238,14 +327,10 @@ async def create_offer(checkout_data: CheckoutRequest):
         "offers": created_offers
     }
 
-@app.get("/offers/user/{user_id}")
-async def get_user_offers(user_id: int):
-    """Получить все заказы пользователя"""
-    user = await User.get_or_none(id=user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    
-    offers = await UserOffer.filter(userId_id=user_id).prefetch_related("machineryTypeId")
+
+@app.get("/offers/user")
+async def get_user_offers(current_user: User = Depends(get_current_user)):
+    offers = await UserOffer.filter(userId_id=current_user.id).prefetch_related("machineryTypeId")
     
     result = []
     for offer in offers:
@@ -257,12 +342,12 @@ async def get_user_offers(user_id: int):
             "start_date": offer.start_date.isoformat(),
             "expiration_date": offer.expiration_date.isoformat(),
             "status": offer.status,
-            "days_offered": offer.days_offered,
-            "hours_offered": offer.hours_offered
         })
     
     return {"offers": result}
 
+
+'''
 @app.get("/offer/{offer_id}")
 async def get_offer_details(offer_id: int):
     """Получить детали конкретного заказа"""
@@ -290,6 +375,7 @@ async def get_offer_details(offer_id: int):
         "days_offered": offer.days_offered,
         "hours_offered": offer.hours_offered
     }
+'''
 
 register_tortoise(
     app, 

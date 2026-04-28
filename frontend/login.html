@@ -33,52 +33,35 @@
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
-        // Проверяем, не авторизован ли уже пользователь
-        const currentUser = UserManager.get();
-        if (currentUser) {
-            // Если уже авторизован, показываем сообщение и кнопку возврата
-            const form = document.getElementById('loginForm');
-            const message = document.getElementById('message');
-            
-            form.style.display = 'none';
-            message.style.display = 'block';
-            message.innerHTML = `
-                <p>Вы уже авторизованы как <strong>${currentUser.username}</strong></p>
-                <div style="margin-top: 1rem;">
-                    <a href="index.html" class="btn">Вернуться в каталог</a>
-                    <a href="profile.html" class="btn btn-success">Перейти в профиль</a>
-                </div>
-            `;
-        }
+		document.getElementById('loginForm').addEventListener('submit',async (e) => {
+			e.preventDefault();
 
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-            
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Вход...';
-            
-            try {
-                const user = await API.login(data);
-		    UserManager.save({
-			    user_id: user.user_id,
-			    username: user.username,
-			    email: user.email
-		    });
-                
-                // Проверяем, куда нужно перенаправить
-                const redirectPage = sessionStorage.getItem('redirectAfterLogin') || 'index.html';
-                sessionStorage.removeItem('redirectAfterLogin');
-                
-                window.location.href = redirectPage;
-            } catch (e) {
-                alert('Ошибка входа: ' + e.message);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Войти';
-            }
-        });
+			const formData = new FormData(e.target);
+			const data = Object.fromEntries(formData.entries());
+			
+			console.log('Submitting login: ', data);
+
+			const submitBtn = e.target.querySelector('button[type="submit"]');
+			submitBtn.disabled = true;
+			submitBtn.textContent = 'Вы успешно вошли в свой аккаунт!';
+
+			try {
+				const response = await API.login(data);
+				
+				console.log('Login success:', response);
+
+				// save JWT token
+				AuthManager.saveToken(response.access_token);
+
+				// redirect
+				window.location.href = 'profile.html';
+
+			} catch (e) {
+				alert('Ошибка входа: ' + e.message);
+				submitBtn.disabled = false;
+				submitBtn.textContent = 'Войти';
+			}
+		});
     </script>
 </body>
 </html>
